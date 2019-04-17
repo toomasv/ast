@@ -190,7 +190,7 @@ context [
 
 	test: make face! [type: 'text size: 200x25]
 
-	#include %/C/Users/Toomas/Documents/Red/rich-text/info.red
+	#include %info.red
 
 	extend system/view/VID/styles [
 		graph: [
