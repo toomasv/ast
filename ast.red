@@ -989,7 +989,7 @@ context [
 			
 		]
 		
-		set 'ast func [code [block! file! any-function! object!] /no-color /local i][
+		set 'ast func [code [block! file! any-function! object! map!] /no-color /local i][
 			bw: no-color
 			clear head nodes
 			clear usr-styles
@@ -1006,6 +1006,9 @@ context [
 				]
 				object? :code [
 					code: load mold/flat code
+				]
+				map? :code [
+					code: append copy [] code
 				]
 			]
 			
