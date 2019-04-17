@@ -20,3 +20,13 @@ Edges can be added by ctrl-dragging from one node to the other. Edge should be d
 Individual nodes can be mooved by dragging. With `shift` all dependent nodes (usually those on right) are moved also. With `shift-alt` parent nodes (usually those on left) are moved. With `shift-<down-arrow>` dependent nodes below current node are moved and with `shift-<up-arrow>` dependent nodes above the current are moved. (For some reason this may break down when changing between moving parent and dependent nodes)
 
 By dragging on canvas a box can be drawn around group of nodes. Surrounded nodes are moved together with box (dragged from border), but this is problematic, as it will affect other nodes on collision. Box can be deleted brom menu opend by right-click on border.
+
+## Scrolling
+
+Use wheel to scroll canvas up and down.
+
+## TBD
+
+* Display labels on edges
+* Find way to speed it up
+* Correct op!-s placement
