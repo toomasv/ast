@@ -1,7 +1,7 @@
 Red [
 	Title: "Red syntax tree explorer"
 	Date: 29-Mar-2019
-	Last: 14-Apr-2019
+	Last: 18-Apr-2019
 	Author: "Toomas Vooglaid"
 ]
 
@@ -106,9 +106,6 @@ context [
 	]
 
 	move-faces: function [face df /with which /together][
-		if together [
-			face/offset: round/to face/offset + df grid
-		]
 		edges: either 'out = which [face/extra/out_][face/extra/in_]
 		foreach edge edges [
 			either 'out = which [
@@ -128,7 +125,11 @@ context [
 				adjust-edges node
 				unless empty? edges2 [move-faces/with node df which2]
 			]
-		]	
+		]
+		if together [
+			face/offset: round/to face/offset + df grid
+			adjust-edges face
+		]
 	]
 
 	remove-in-faces: function [face][
@@ -181,7 +182,7 @@ context [
 		]
 	]
 	
-	adjust-pane-height: has [lowest initial][
+	adjust-panel-height: has [lowest initial][
 		if (initial: gr/size/y) + min-size/y < lowest: ast-ctx/get-y :last last top-nodes [
 			gr/size/y: lowest + min-size/y
 			resize-edges
@@ -416,8 +417,7 @@ context [
 										new: collect [forall block [keep 'node keep mold first block]]
 										append nodes layout/only new
 										until [tail? nodes: ast-ctx/connect face nodes]
-										adjust-pane-height
-										;probe encode face
+										adjust-panel-height
 									]
 									find [block! paren! map!] type: type?/word block: first face/data [
 										nodes: tail face/parent/pane
@@ -439,7 +439,7 @@ context [
 											]
 										]
 										ast-ctx/lower/md/extention face 0 true
-										adjust-pane-height
+										adjust-panel-height
 									]
 									word? word: first face/data [
 										get/any word
@@ -620,7 +620,7 @@ context [
 			max-y: max-y + min-size/y + dy
 		]
 		
-		get-y: function [which node][
+		get-y: function [which [function!] node [object!]][ ; which -> :first or :last
 			either empty? in_: node/extra/in_ [
 				node/offset/y
 			][
@@ -645,28 +645,28 @@ context [
 				]
 				root/offset/y: diff / 2 + fsy
 				adjust-edges root
-				either empty? root/extra/out_ [
+			]
+			either empty? root/extra/out_ [
+				if ext [
+					if not tail? found: find/tail top-nodes root [
+						foreach node found [
+							move-faces/together node as-pair 0 maxdiff
+							adjust-edges node
+						]
+					]
+				]
+			][
+				foreach outedge root/extra/out_ [
+					outnode: outedge/extra/to
 					if ext [
-						if not tail? found: find/tail top-nodes root [
-							foreach node found [
-								move-faces/together node as-pair 0 maxdiff
-								adjust-edges node
-							]
+						loweredges: find/tail outnode/extra/in_ outedge
+						foreach loweredge loweredges [
+							face: loweredge/extra/from
+							move-faces/together face as-pair 0 maxdiff
+							adjust-edges face
 						]
 					]
-				][
-					foreach outedge root/extra/out_ [
-						outnode: outedge/extra/to
-						if ext [
-							loweredges: find/tail outnode/extra/in_ outedge
-							foreach loweredge loweredges [
-								face: loweredge/extra/from
-								move-faces/together face as-pair 0 maxdiff
-								adjust-edges face
-							]
-						]
-						lower/md/extention outnode maxdiff ext
-					]
+					lower/md/extention outnode maxdiff ext
 				]
 			]
 		]
@@ -895,45 +895,60 @@ context [
 		]
 		
 		make-ops: function [val1 op nodes /with root][
-			if with [
-				op/offset: root/offset + as-pair root/size/x + dx 0
-			]
-			op-x: op/offset/x + op/size/x
-			val1/offset: op/offset
+			op/offset: val1/offset
 			push-right val1 round/to op/size/x + dx grid
 			val2: nodes/1
-			val2/offset/x: round/to op-x + dx grid
-			inc-max-y
-			lower op 
+			val2/offset/x: val1/offset/x
+			val1_: either all [
+				val2/size/x > val1/size/x 
+				1 < probe len: length? val1/extra/in_
+			][val1/extra/in_/:len/extra/from][val1]
+			max-y: round/to val1_/offset/y + val1_/size/y + dy grid
 			val2/offset/y: max-y
 			add-edge/with val1 op nodes "value1"
 			add-edge/with val2 op nodes "value2"
+			lower op 
+			print [val1/text op/text val2/text op/offset attempt [root/text] attempt [root/offset]]
 			rest: skip nodes 2
 			case [
-				all [3 <= length? rest is-op? rest/2] [set [op rest] make-ops/with op rest/2 skip rest 2 root]
+				all [3 <= length? rest is-op? rest/2][
+					set [op rest] make-ops/with op rest/2 skip rest 2 root
+				]
 			]
 			reduce [op rest]
 		]
 		
-		connect: func [root nodes /with label idx /dialect dsl /only /local node _2 edg fn inf][
+		connect: func [root nodes /with label idx /dialect dsl /only /local node inf df][
 			label: any [label copy ""]
 			
 			either all [ ; In case we have operation next
 				3 <= length? nodes
 				is-op? nodes/2
 			][
+				nodes/2/offset: nodes/1/offset: round/to root/offset + as-pair root/size/x + dx 0 grid
 				set [node nodes] make-ops/with nodes/1 nodes/2 skip nodes 2 root
-				max-y: root/offset/y
+				max-y: node/offset/y
 			][
 				node: nodes/1
+				node/offset/x: round/to root/offset/x + root/size/x + dx grid
 			]
 			
-			node/offset/x: round/to root/offset/x + root/size/x + dx grid
-			
 			if 0 < length? root/extra/in_ [inc-max-y]
-			node/offset/y: max-y
+			
+			either is-op? node [
+				df: max-y - node/offset/y
+				move-faces/together node as-pair 0 df
+			][
+				node/offset/y: max-y
+			]
 						
 			add-edge/with node root nodes: next nodes label
+
+			if is-op? node [
+				lower root
+				max-y: get-y :last node
+			]
+
 			if only [return next nodes]
 			
 			either dialect [
@@ -986,7 +1001,6 @@ context [
 				true [nods: next nodes]
 			]
 			nods
-			
 		]
 		
 		set 'ast func [code [block! file! any-function! object! map!] /no-color /local i][
@@ -1028,26 +1042,33 @@ context [
 			] nodes 'resize
 
 			nodes: gr/pane 
-			
-			append top-nodes first nodes
 
-			while [not tail? nodes: make-tree nodes][
-				inc-max-y
-				i: pick [2 1] to-logic all [
-					3 <= length? nodes 
+			until [
+				nodes/1/offset: as-pair 10 max-y
+				either all [
+					3 <= length? nodes
 					is-op? nodes/2
+				][
+					nodes/2/offset: nodes/1/offset
+					set [op nodes] make-ops nodes/1 nodes/2 skip nodes 2
+					append top-nodes op
+					max-y: get-y :last op
+					nodes: next nodes
+				][
+					append top-nodes first nodes
+					nodes: make-tree nodes
 				]
-				nodes/:i/offset: as-pair 10 max-y
-				append top-nodes nodes/:i
+				inc-max-y
+				tail? nodes
 			]
-			
-			adjust-pane-height
+
+			adjust-panel-height
 
 			do-events
 		]
 	]
 ]
-;Example
+;Examples
 comment [ 
 	ast [print copy/part mark: find/tail read %somefile.txt "<" any [find mark ">" tail mark]]
 	
@@ -1059,5 +1080,11 @@ comment [
 		at 40x50 text "First box" return 
 		button "OK" [unview]
 	]] 
+	
+	ast %mycode.red
+	
+	ast :collect
+	
+	ast system/view
 ]
 
