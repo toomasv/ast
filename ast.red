@@ -318,7 +318,15 @@ context [
 						'done
 					]
 
-					on-up: func [face event][current: none boxing?: no]
+					on-up: func [face event /local new-node new-edge][
+						either up? [
+							new-node: last append face/pane layout/only compose [
+								at (round/to event/offset + event/face/offset - (min-size / 2) grid) node
+							]
+						][
+							current: none boxing?: no
+						]
+					]
 
 					on-menu: func [face event /local new][
 						switch/default event/picked [
