@@ -6,7 +6,7 @@ Red [
 ]
 
 context [
-	up?: no
+	up?: mid-up?: no
 	pos: 0x0
 	boxing?: no
 	grid: 5
@@ -217,12 +217,18 @@ context [
 		con/extra/from/offset - con/extra/to/offset / 2 + con/extra/to/offset
 	]
 	
-	add-out-edge: function [face][
+	add-edge-start: function [face /into][
 		labl: copy ""
-		lay: layout/only compose/deep/only bind connector :add-out-edge ;:on-down
-		insert face/parent/pane lay
-		append face/extra/out_ lay ;face/parent/pane/1
-		first lay
+		edge: first layout/only compose/deep/only bind connector :add-edge-start
+		insert face/parent/pane edge
+		either into [
+			edge/extra/to: edge/extra/from
+			edge/extra/from: none
+			append face/extra/in_ edge
+		][
+			append face/extra/out_ edge
+		]
+		edge
 	]
 	
 	colorize: function [face][
@@ -315,16 +321,26 @@ context [
 							current/size: (current/draw/3: current/draw/10: event/offset - current/offset) + 10
 						]
 						pos: event/offset
+						if all [event/ctrl? event/mid-down? face = event/face] [ ; `mid-down?` doesn't work as `down?`
+							face/pane/1/draw/4: pos
+						]
 						'done
 					]
 
-					on-up: func [face event /local new-node new-edge][
+					on-up: func [face event][
 						either up? [
-							new-node: last append face/pane layout/only compose [
+							append face/pane layout/only compose [
 								at (round/to event/offset + event/face/offset - (min-size / 2) grid) node
 							]
 						][
 							current: none boxing?: no
+						]
+					]
+					
+					on-mid-up: func [face event /local new-node][
+						mid-up?: yes
+						append face/pane layout/only compose [
+							at (round/to event/offset - (min-size / 2) grid) node
 						]
 					]
 
@@ -387,13 +403,21 @@ context [
 					diff: ofs: df: 0x0
 					move-left: move-upper: move-lower: false
 					on-down: func [face event /local lay labl] [
-						set-focus face ;probe event/window/selected/text
+						set-focus face 
 						either event/ctrl? [
-							add-out-edge face
+							add-edge-start face
 						][
 							diff: event/offset
 							ofs: face/offset
 						] 'done
+					]
+
+					on-mid-down: func [face event /local lay labl] [
+						set-focus face 
+						if event/ctrl? [
+							add-edge-start/into face
+						]
+						'done
 					]
 					
 					on-key-down: func [face event][
@@ -412,7 +436,7 @@ context [
 						]
 					]
 					
-					on-over: func [face event /local edge found] [ 
+					on-over: func [face event /local edge found i] [ 
 						unless boxing? [
 							if event/down? [
 								case [
@@ -444,10 +468,16 @@ context [
 								append face/extra/in_ face/parent/pane/1 
 								up?: no
 							] 
+							if mid-up? [
+								face/parent/pane/1/draw/4: face/size / 2 + face/offset
+								face/parent/pane/1/extra/from: face 
+								append face/extra/out_ face/parent/pane/1 
+								mid-up?: no
+							] 
 						] ;'done 
 					]
 					
-					on-up: func [face event] [if event/ctrl? [up?: yes]] 
+					on-up: func [face event] [if event/ctrl? [up?: yes]]
 					
 					on-menu: func [face event /local type block nodes new word found] [
 						switch event/picked [
@@ -639,7 +669,7 @@ context [
 								old-node: face/extra/to
 								face/extra/to: new-node
 								append new-node/extra/in_ face
-								new-edge: add-out-edge new-node
+								new-edge: add-edge-start new-node
 								change find old-node/extra/in_ face new-edge
 								new-edge/extra/to: old-node
 								adjust-edges new-node
