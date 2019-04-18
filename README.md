@@ -28,4 +28,4 @@ Use wheel to scroll canvas up and down.
 ## TBD
 
 * Find way to speed it up
-* Add and remove nodes on existing edges
+* Add System dialect(?)
