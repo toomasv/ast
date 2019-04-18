@@ -81,10 +81,10 @@ context [
 		name
 	]
 
-	ask-name: func [what] [
+	ask-name: func [what /local name namef] [
 		name: either what = 'new [none][either object? what [what/text][form what]]
 		view/flags compose [
-			title "Edit node"
+			title "Edit"
 			namef: field (any [name copy ""]) focus on-enter [name: face/text unview]
 			return
 			button "OK" [name: namef/text unview] 
@@ -597,6 +597,9 @@ context [
 					"Add node" _add-node 
 					"Add point" _add-point 
 					"Remove point" _remove-point 
+					"Edit label" _edit-label
+					"Show label" _show-label
+					"Hide-label" _hide-label
 				]
 				actors: [
 					point: circ: none
@@ -664,6 +667,26 @@ context [
 									| 	skip
 									]
 								]
+							]
+							_edit-label [
+								face/extra/label: ask-name face/extra/label
+								found: find face/draw 'text
+								found/2: get-edge-text-pos face
+								found/3: face/extra/label
+								;if found: find face/menu "Show label" [
+								;	change/part found ["Hide label" _hide-label] 2
+								;]
+							]
+							_show-label [
+								found: find face/draw 'text
+								found/2: get-edge-text-pos face
+								found/3: face/extra/label
+								;change/part find face/menu "Show label" ["Hide label" _hide-label] 2
+							]
+							_hide-label [
+								found: find face/draw 'text
+								found/3: ""
+								;change/part find face/menu "Hide label" ["Show label" _show-label] 2
 							]
 						] 'done
 					]
