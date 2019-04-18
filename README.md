@@ -29,4 +29,4 @@ Use wheel to scroll canvas up and down.
 
 * Display labels on edges
 * Find way to speed it up
-* Correct op!-s placement
+* Add and remove nodes on existing edges
