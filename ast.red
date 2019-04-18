@@ -27,7 +27,26 @@ context [
 		]
 	]
 
-	expunge: func [face /from pane][pane: any [pane face/parent/pane] remove find pane face] 
+	expunge: func [face /from pane][
+		pane: any [pane face/parent/pane] 
+		remove find pane face
+	] 
+	
+	detach: function [face][
+		foreach con face/extra/out_ [
+			to-node: con/extra/to
+			expunge/from con to-node/extra/in_
+			con/extra/to: con/extra/from: none
+			expunge con
+			foreach edge face/extra/in_ [
+				append to-node/extra/in_ edge
+				edge/extra/to: to-node
+			]
+			adjust-edges to-node
+		]
+		clear face/extra/out_
+		clear face/extra/in_
+	]
 
 	is-func?: function [face][
 		all [
@@ -198,6 +217,43 @@ context [
 		con/extra/from/offset - con/extra/to/offset / 2 + con/extra/to/offset
 	]
 	
+	add-out-edge: function [face][
+		labl: copy ""
+		lay: layout/only compose/deep/only bind connector :add-out-edge ;:on-down
+		insert face/parent/pane lay
+		append face/extra/out_ lay ;face/parent/pane/1
+		first lay
+	]
+	
+	colorize: function [face][
+		data: first face/data
+		unless bw [
+			face/draw/2: case [
+				any-object? data 	[pink]
+				all [
+					find [word! path! get-word! get-path!] type?/word data
+					inf: info :data
+				][either function! = inf/type 
+									[crimson]
+									[papaya]]
+				all [word? data attempt/safer [find [datatype! typeset!] type?/word get/any data]]
+									[yellow]
+				map? data 			[teal]
+				any-path? data 		[yello]
+				any-block? data 	[gold]
+				scalar? data 		[silver]
+				binary? data 		[linen]
+				any-string? data 	[orange]
+				find [set-word! set-path!] type?/word data 
+									[green]
+				any-word? data 		[sky]
+				immediate? data 	[tanned]
+				default? data 		[khaki]
+				'else 				[white]
+			]
+		]
+	]
+	
 	test: make face! [type: 'text size: 200x25]
 
 	#include %info.red
@@ -315,6 +371,8 @@ context [
 					"Show" 		_show 
 					"Copy"		_copy
 					"Delete" 	_delete
+					"Remove"	_remove
+					"Detach"	_detach
 				]; "Turn" ["N" _n "E" _e "S" _s "W" _w]]
 				data: copy []
 				actors: [
@@ -323,10 +381,7 @@ context [
 					on-down: func [face event /local lay labl] [
 						set-focus face ;probe event/window/selected/text
 						either event/ctrl? [
-							labl: copy ""
-							lay: layout/only compose/deep/only bind connector :on-down
-							insert face/parent/pane lay
-							append face/extra/out_ face/parent/pane/1
+							add-out-edge face
 						][
 							diff: event/offset
 							ofs: face/offset
@@ -395,6 +450,7 @@ context [
 									either empty? face/data [
 										face/data: load/all face/text
 									][change face/data load face/text]
+									colorize face
 								]
 							]
 							_labels [
@@ -418,14 +474,23 @@ context [
 							_delete [
 								foreach con face/extra/out_ [
 									expunge/from con con/extra/to/extra/in_
+									con/extra/to: con/extra/from: none
 									expunge con
 								]
 								foreach con face/extra/in_ [
 									expunge/from con con/extra/from/extra/out_
+									con/extra/to: con/extra/from: none
 									expunge con
 								]
+								clear face/extra/out_
+								clear face/extra/in_
 								expunge face
 							]
+							_remove [
+								detach face
+								expunge face
+							]
+							_detach [detach face]
 							_expand parse vid draw rich-text spec [;shape 
 								case [
 									1 < length? encoded: encode face [
@@ -511,32 +576,7 @@ context [
 				]
 				unless face/text [face/text: copy ""]
 				face/data: load/all face/text
-				data: first face/data
-				unless bw [
-					face/draw/2: case [
-						any-object? data 	[pink]
-						all [
-							find [word! path! get-word! get-path!] type?/word data
-							inf: info :data
-						][either function! = inf/type 
-											[crimson]
-											[papaya]]
-						all [word? data attempt/safer [find [datatype! typeset!] type?/word get/any data]]
-											[yellow]
-						map? data 			[teal]
-						any-path? data 		[yello]
-						any-block? data 	[gold]
-						scalar? data 		[silver]
-						binary? data 		[linen]
-						any-string? data 	[orange]
-						find [set-word! set-path!] type?/word data 
-											[green]
-						any-word? data 		[sky]
-						immediate? data 	[tanned]
-						default? data 		[khaki]
-						'else 				[white]
-					]
-				]
+				colorize face
 				prepare face
 			]
 		]
@@ -544,7 +584,12 @@ context [
 			template: [
 				type: 'base
 				flags: 'all-over
-				menu: ["Delete" _delete "Add point" _add "Remove point" _remove]
+				menu: [
+					"Delete" _delete 
+					"Add node" _add-node 
+					"Add point" _add-point 
+					"Remove point" _remove-point 
+				]
 				actors: [
 					point: circ: none
 					
@@ -569,14 +614,27 @@ context [
 						'done
 					]
 					
-					on-menu: func [face event] [
+					on-menu: func [face event /local new-node new-edge old-node] [
 						switch event/picked [
 							_delete [
 								expunge/from face face/extra/from/extra/out_
 								expunge/from face face/extra/to/extra/in_
 								expunge face
 							]
-							_add [
+							_add-node [
+								new-node: last append gr/pane layout/only compose [
+									at (round/to event/offset - (min-size / 2) grid) node
+								]
+								old-node: face/extra/to
+								face/extra/to: new-node
+								append new-node/extra/in_ face
+								new-edge: add-out-edge new-node
+								change find old-node/extra/in_ face new-edge
+								new-edge/extra/to: old-node
+								adjust-edges new-node
+								adjust-edges old-node
+							]
+							_add-point [
 								found: next find/tail face/draw 'spline
 								while [
 									not within? event/offset 
@@ -587,7 +645,7 @@ context [
 								append face/draw compose [circle (event/offset) 1]
 								
 							]
-							_remove [
+							_remove-point [
 								found: skip find face/draw 'spline 2
 								parse found [
 									some [
@@ -1063,27 +1121,29 @@ context [
 			] nodes 'resize
 
 			nodes: gr/pane 
-
-			until [
-				nodes/1/offset: as-pair 10 max-y
-				either all [
-					3 <= length? nodes
-					is-op? nodes/2
-				][
-					nodes/2/offset: nodes/1/offset
-					set [op nodes] make-ops nodes/1 nodes/2 skip nodes 2
-					append top-nodes op
-					max-y: get-y :last op
-					nodes: next nodes
-				][
-					append top-nodes first nodes
-					nodes: make-tree nodes
+			
+			if not empty? nodes [
+				until [
+					nodes/1/offset: as-pair 10 max-y
+					either all [
+						3 <= length? nodes
+						is-op? nodes/2
+					][
+						nodes/2/offset: nodes/1/offset
+						set [op nodes] make-ops nodes/1 nodes/2 skip nodes 2
+						append top-nodes op
+						max-y: get-y :last op
+						nodes: next nodes
+					][
+						append top-nodes first nodes
+						nodes: make-tree nodes
+					]
+					inc-max-y
+					tail? nodes
 				]
-				inc-max-y
-				tail? nodes
-			]
 
-			adjust-panel-height
+				adjust-panel-height
+			]
 
 			do-events
 		]
