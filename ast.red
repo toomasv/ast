@@ -22,7 +22,7 @@ context [
 
 	connector: [
 		at 0x0 edge with [
-			draw: [pen black spline (ofs: face/size / 2 + face/offset) (ofs)]
+			draw: [pen black spline (ofs: face/size / 2 + face/offset) (ofs) text 0x0 ""]
 			extra: [type: 'edge from: (face) to: (none) label: (labl)]
 		]
 	]
@@ -90,17 +90,22 @@ context [
 
 	adjust-edges: function [face][
 		foreach edge face/extra/in_ [
-			if found: either pair? last edge/draw [
-				back tail edge/draw
+			last-point: find edge/draw 'text
+			;if found: either pair? last edge/draw [
+			if found: either pair? first back last-point [
+				back last-point ;back tail edge/draw
 			][
 				back find edge/draw 'circle
 			][
+				if last-point [last-point/2: get-edge-text-pos edge]
 				found/1: face/size / 2 + face/offset
 			]
 		]
 		foreach edge face/extra/out_ [
+			last-point: find edge/draw 'text
 			if found: find/tail edge/draw 'spline [
 				found/1: face/size / 2 + face/offset
+				if last-point [last-point/2: get-edge-text-pos edge]
 			]
 		]
 	]
@@ -189,6 +194,10 @@ context [
 		]
 	]
 
+	get-edge-text-pos: func [con][
+		con/extra/from/offset - con/extra/to/offset / 2 + con/extra/to/offset
+	]
+	
 	test: make face! [type: 'text size: 200x25]
 
 	#include %info.red
@@ -377,7 +386,7 @@ context [
 					
 					on-up: func [face event] [if event/ctrl? [up?: yes]] 
 					
-					on-menu: func [face event /local type block nodes new word] [
+					on-menu: func [face event /local type block nodes new word found] [
 						switch event/picked [
 							_edit [
 								all [
@@ -389,7 +398,19 @@ context [
 								]
 							]
 							_labels [
-								if face/extra/info []
+								foreach con face/extra/in_ [
+									found: find con/draw 'text
+									found/2: get-edge-text-pos con
+									found/3: con/extra/label
+								]
+								change/part find face/menu "Labels" ["Hide labels" _hide-labels] 2
+							]
+							_hide-labels [
+								foreach con face/extra/in_ [
+									found: find con/draw 'text
+									found/3: ""
+								]
+								change/part find face/menu "Hide Labels" ["Labels" _labels] 2
 							]
 							_show [probe encode face]
 							_eval [print encode face]
