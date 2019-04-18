@@ -13,7 +13,7 @@ Try out options on contextual menu while pointing on node.
 
 Nodes can be added, edited and deleted from menu opened by right-clicking on canvas, edge or node itself.
 
-Also, if ctrl-dragging from a node and releasing mouse over canvas, empty node is added, connected to the initial node.
+Also, if ctrl-dragging from a node and releasing mouse over canvas, empty node is added, connected to the initial node. If dragged with left-button, logic of direction is from arg to root, if dragged with mid-button, logic is from root to arg.
 
 Edges can be added by ctrl-dragging from one node to the other. Edge should be drawn from argument to root. Root may be function name or collector. Collector is either empty node for block, `()` for paren or `#()` for map. Text should be entered with delimiters, as well as all data with special syntax.
 
