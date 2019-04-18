@@ -27,6 +27,5 @@ Use wheel to scroll canvas up and down.
 
 ## TBD
 
-* Display labels on edges
 * Find way to speed it up
 * Add and remove nodes on existing edges
