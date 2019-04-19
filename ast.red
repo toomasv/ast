@@ -27,12 +27,12 @@ context [
 		]
 	]
 
-	expunge: func [face /from pane][
+	expunge: func [face [object!] /from pane [block!]][
 		pane: any [pane face/parent/pane] 
 		remove find pane face
 	] 
 	
-	detach: function [face][
+	detach: function [face [object!]][
 		foreach con face/extra/out_ [
 			to-node: con/extra/to
 			expunge/from con to-node/extra/in_
@@ -48,7 +48,7 @@ context [
 		clear face/extra/in_
 	]
 
-	is-func?: function [face][
+	is-func?: function [face [object!]][
 		all [
 			fn: first face/data
 			find [word! path!] type?/word fn 
@@ -56,7 +56,7 @@ context [
 		]
 	]
 
-	is-op?: function [face][
+	is-op?: function [face [object!]][
 		all [
 			inf: is-func? face
 			inf/type = op!
@@ -64,7 +64,7 @@ context [
 		]
 	]
 
-	ask-name-min: func [what event /local namef nam] [
+	ask-name-min: func [what [any-type!] event [event!] /local namef nam] [
 		name: either what = 'new [none][either object? what [what/text][form what]]
 		view/flags/options compose [
 			namef: field (nam: any [name copy ""]) (max min-size size-text/with test nam) focus 
@@ -81,7 +81,7 @@ context [
 		name
 	]
 
-	ask-name: func [what /local name namef] [
+	ask-name: func [what [any-type!] /local name namef] [
 		name: either what = 'new [none][either object? what [what/text][form what]]
 		view/flags compose [
 			title "Edit"
@@ -94,20 +94,20 @@ context [
 		name
 	]
 
-	calc-size: function [face][
+	calc-size: function [face [object!]][
 		sz: size-text/with test face/text
 		face/size/x: max 25 sz/x + 5
 		face/draw/10: face/size / 2 - (sz / 2)
 		face/draw/7: face/size - 1
 	]
 
-	prepare: function [face][
+	prepare: function [face [object!]][
 		calc-size face
 		found: find/tail face/draw 'text 
 		found/2: face/text
 	]
 
-	adjust-edges: function [face][
+	adjust-edges: function [face [object!]][
 		foreach edge face/extra/in_ [
 			last-point: find edge/draw 'text
 			;if found: either pair? last edge/draw [
@@ -129,7 +129,7 @@ context [
 		]
 	]
 
-	move-faces: function [face df /with which /together][
+	move-faces: function [face [object!] df [pair!] /with which [none! word!] /together][
 		edges: either 'out = which [face/extra/out_][face/extra/in_]
 		foreach edge edges [
 			either 'out = which [
@@ -156,7 +156,7 @@ context [
 		]
 	]
 
-	remove-in-faces: function [face][
+	remove-in-faces: function [face [object!]][
 		foreach con face/extra/in_ [
 			in-face: con/extra/from
 			con/extra/from: con/extra/to: none
@@ -172,7 +172,7 @@ context [
 		clear face/extra/in_
 	]
 
-	encode: function [face][
+	encode: function [face [object!]][
 		res: copy either find ["()" "#()"] face/text [[]][face/data]
 		edges: face/extra/in_
 		forall edges [
@@ -194,7 +194,7 @@ context [
 		res
 	]
 	
-	get-plain: func [face][
+	get-plain: func [face [object!]][
 		next head remove back tail mold encode face
 	]
 
@@ -213,11 +213,11 @@ context [
 		]
 	]
 
-	get-edge-text-pos: func [con][
+	get-edge-text-pos: func [con [object!]][
 		con/extra/from/offset - con/extra/to/offset / 2 + con/extra/to/offset
 	]
 	
-	add-edge-start: function [face /into][
+	add-edge-start: function [face [object!] /into][
 		labl: copy ""
 		edge: first layout/only compose/deep/only bind connector :add-edge-start
 		insert face/parent/pane edge
@@ -231,7 +231,7 @@ context [
 		edge
 	]
 	
-	colorize: function [face][
+	colorize: function [face [object!]][
 		data: first face/data
 		unless bw [
 			face/draw/2: case [
@@ -260,7 +260,7 @@ context [
 		]
 	]
 	
-	attach-edge-to: func [face /reverse /local i side block][
+	attach-edge-to: func [face [object!] /reverse /local i side block][
 		set [i side block] pick [[4 from out_][5 to in_]] reverse
 		face/parent/pane/1/draw/:i: face/size / 2 + face/offset
 		face/parent/pane/1/extra/:side: face 
@@ -548,6 +548,7 @@ context [
 							]
 							_detach [detach face]
 							_expand parse vid draw rich-text spec [;shape 
+								gr/visible?: no
 								case [
 									1 < length? encoded: encode face [
 										nodes: tail face/parent/pane
@@ -590,6 +591,7 @@ context [
 										do face/data
 									]
 								]
+								gr/visible?: yes
 							]
 							_flatten [
 								face/text: copy get-plain face ;next head remove back tail mold encode face
@@ -1059,14 +1061,13 @@ context [
 			val2/offset/x: val1/offset/x
 			val1_: either all [
 				val2/size/x > val1/size/x 
-				1 < probe len: length? val1/extra/in_
+				1 < len: length? val1/extra/in_
 			][val1/extra/in_/:len/extra/from][val1]
 			max-y: round/to val1_/offset/y + val1_/size/y + dy grid
 			val2/offset/y: max-y
 			add-edge/with val1 op nodes "value1"
 			add-edge/with val2 op nodes "value2"
 			lower op 
-			print [val1/text op/text val2/text op/offset attempt [root/text] attempt [root/offset]]
 			rest: skip nodes 2
 			case [
 				all [3 <= length? rest is-op? rest/2][
@@ -1191,7 +1192,7 @@ context [
 				]
 			]
 
-			view/flags/no-wait lay: layout append/only copy [
+			lay: layout/flags append/only copy [
 				on-resizing [
 					gr/size: max gr/size face/size - 20
 					resize-edges
@@ -1224,7 +1225,7 @@ context [
 				adjust-panel-height
 			]
 
-			do-events
+			view lay
 		]
 	]
 ]
