@@ -1,7 +1,7 @@
 Red [
 	Title: "Red syntax tree explorer"
 	Date: 29-Mar-2019
-	Last: 18-Apr-2019
+	Last: 19-Apr-2019
 	Author: "Toomas Vooglaid"
 ]
 
@@ -260,6 +260,13 @@ context [
 		]
 	]
 	
+	attach-edge-to: func [face /reverse /local i side block][
+		set [i side block] pick [[4 from out_][5 to in_]] reverse
+		face/parent/pane/1/draw/:i: face/size / 2 + face/offset
+		face/parent/pane/1/extra/:side: face 
+		append face/extra/:block face/parent/pane/1 
+	]
+	
 	test: make face! [type: 'text size: 200x25]
 
 	#include %info.red
@@ -327,20 +334,30 @@ context [
 						'done
 					]
 
-					on-up: func [face event][
+					on-up: func [face event /local found][
 						either up? [
-							append face/pane layout/only compose [
-								at (round/to event/offset + event/face/offset - (min-size / 2) grid) node
+							foreach-face/with face [found: yes break][
+								all [
+									face/extra/type = 'node
+									within? event/face/offset + event/offset face/offset face/size
+								]
+							]
+							if not found [
+								append face/pane layout/only compose [
+									at (round/to event/offset + event/face/offset - (min-size / 2) grid) node
+								]
 							]
 						][
 							current: none boxing?: no
 						]
 					]
 					
-					on-mid-up: func [face event /local new-node][
-						mid-up?: yes
-						append face/pane layout/only compose [
-							at (round/to event/offset - (min-size / 2) grid) node
+					on-mid-up: func [face event /local new-node found][
+						if not mid-up? [
+							mid-up?: yes
+							append face/pane layout/only compose [
+								at (round/to event/offset - (min-size / 2) grid) node
+							]
 						]
 					]
 
@@ -463,15 +480,11 @@ context [
 								]
 							]
 							if up? [
-								face/parent/pane/1/draw/5: face/size / 2 + face/offset
-								face/parent/pane/1/extra/to: face 
-								append face/extra/in_ face/parent/pane/1 
+								attach-edge-to face
 								up?: no
 							] 
-							if mid-up? [
-								face/parent/pane/1/draw/4: face/size / 2 + face/offset
-								face/parent/pane/1/extra/from: face 
-								append face/extra/out_ face/parent/pane/1 
+							if mid-up? = true [
+								attach-edge-to/reverse face
 								mid-up?: no
 							] 
 						] ;'done 
@@ -479,15 +492,20 @@ context [
 					
 					on-up: func [face event] [if event/ctrl? [up?: yes]]
 					
+					on-mid-up: func [face event] [
+						if event/ctrl? [
+							attach-edge-to/reverse face
+							mid-up?: 'done
+						]
+					]
+					
 					on-menu: func [face event /local type block nodes new word found] [
 						switch event/picked [
 							_edit [
 								all [
 									attempt [face/text: ask-name face]
 									prepare face
-									either empty? face/data [
-										face/data: load/all face/text
-									][change face/data load face/text]
+									face/data: load/all face/text
 									colorize face
 								]
 							]
