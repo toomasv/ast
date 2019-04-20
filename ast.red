@@ -262,7 +262,6 @@ graph-ctx: context [
 									[green]
 				any-word? data 		[sky]
 				immediate? data 	[tanned]
-				default? data 		[khaki]
 				'else 				[white]
 			]
 		]
@@ -418,6 +417,7 @@ graph-ctx: context [
 					"Eval" 		_eval 
 					"Show" 		_show 
 					"Copy"		_copy
+					"Extract"	_extract
 					"Delete" 	_delete
 					"Remove"	_remove
 					"Detach"	_detach
@@ -534,6 +534,7 @@ graph-ctx: context [
 							_show [probe encode face]
 							_eval [print encode face]
 							_copy [write-clipboard get-plain face]
+							_extract [ast copy encode face]
 							_delete [
 								foreach con face/extra/out_ [
 									expunge/from con con/extra/to/extra/in_
@@ -606,10 +607,13 @@ graph-ctx: context [
 								probe now/time/precise - time
 							]
 							_flatten [
+								system/view/auto-sync?: off
 								face/text: copy get-plain face
 								remove-in-faces face
 								face/data: load/all face/text
 								prepare face
+								show lay
+								system/view/auto-sync?: on
 							]
 							_shorten [
 								shorten-text face 30
@@ -1171,14 +1175,19 @@ graph-ctx: context [
 			nods
 		]
 		
-		set 'ast func [code [block! file! any-function! object! map!] /no-color /local i time][
-			time: now/time/precise
+		set 'ast func [code [block! file! any-function! object! map!] /new /no-color /local i time][
+			;time: now/time/precise
 			bw: no-color
+			
+			;if new [
+			;	
+			;]
 			clear head nodes
 			clear usr-styles
-			max-y: dy
 			clear rt-stuff
 			clear top-nodes
+			
+			max-y: dy
 				
 			case [
 				file? :code [
@@ -1237,11 +1246,11 @@ graph-ctx: context [
 				adjust-panel-height
 			]
 
-			view/no-wait lay
+			view lay
 
-			probe now/time/precise - time
+			;probe now/time/precise - time
 			
-			do-events
+			;do-events
 		]
 	]
 ]
