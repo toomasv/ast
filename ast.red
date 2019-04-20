@@ -1,22 +1,25 @@
 Red [
 	Title: "Red syntax tree explorer"
+	Needs: View
 	Date: 29-Mar-2019
 	Last: 19-Apr-2019
 	Author: "Toomas Vooglaid"
 ]
 
-context [
+graph-ctx: context [
 	up?: mid-up?: no
 	pos: 0x0
 	boxing?: no
 	grid: 5
 	min-size: 25x25
 	initial-size: 550x650
+	current: box: none
+	direction: 'left-down
 	
-	dx: 10
+	dx: 20
 	max-y: dy: 10
 	lower-by: round (2 * min-size/y + dy / 2 - (min-size/y / 2)) grid
-	lay: gr: bw: none
+	lay: gr: edgs: bw: none
 	rt-stuff: copy []
 	top-nodes: copy []
 
@@ -102,9 +105,16 @@ context [
 	]
 
 	prepare: function [face [object!]][
+		if 50 < length? face/text [face/text: append copy/part face/text 47 "..."]
 		calc-size face
 		found: find/tail face/draw 'text 
 		found/2: face/text
+	]
+	
+	shorten-text: func [face [object!] len [integer!]][
+		face/text: append copy/part face/text len "..."
+		prepare face
+		adjust-edges face
 	]
 
 	adjust-edges: function [face [object!]][
@@ -195,20 +205,18 @@ context [
 	]
 	
 	get-plain: func [face [object!]][
-		next head remove back tail mold encode face
+		next head remove back tail mold/flat encode face
 	]
 
 	resize-edges: does [
-		foreach-face/with gr [
-			face/size: gr/size
-		][
-			face/extra/type = 'edge
+		foreach-face edgs [
+			face/size: edgs/size
 		]
 	]
 	
-	adjust-panel-height: has [lowest initial][
-		if (initial: gr/size/y) + min-size/y < lowest: ast-ctx/get-y :last last top-nodes [
-			gr/size/y: lowest + min-size/y
+	adjust-panel-height: has [lowest][
+		if gr/size/y - min-size/y < lowest: ast-ctx/get-y :last last top-nodes [
+			gr/size/y: edgs/size/y: lowest + min-size/y + dy
 			resize-edges
 		]
 	]
@@ -220,7 +228,7 @@ context [
 	add-edge-start: function [face [object!] /into][
 		labl: copy ""
 		edge: first layout/only compose/deep/only bind connector :add-edge-start
-		insert face/parent/pane edge
+		append edgs/pane edge
 		either into [
 			edge/extra/to: edge/extra/from
 			edge/extra/from: none
@@ -260,11 +268,12 @@ context [
 		]
 	]
 	
-	attach-edge-to: func [face [object!] /reverse /local i side block][
+	attach-edge-to: func [face [object!] /reverse /local n i side block][
 		set [i side block] pick [[4 from out_][5 to in_]] reverse
-		face/parent/pane/1/draw/:i: face/size / 2 + face/offset
-		face/parent/pane/1/extra/:side: face 
-		append face/extra/:block face/parent/pane/1 
+		n: length? edgs/pane
+		edgs/pane/:n/draw/:i: face/size / 2 + face/offset
+		edgs/pane/:n/extra/:side: face 
+		append face/extra/:block edgs/pane/:n
 	]
 	
 	test: make face! [type: 'text size: 200x25]
@@ -275,13 +284,34 @@ context [
 		graph: [
 			template: [
 				type: 'panel
-				size 500x500
-				flags: 'all-over
-				menu: ["Node" _node "Text" _text]
+				size: initial-size
 				actors: [
-					current: box: none 
-
-					on-down: func [face event][
+					on-up: func [face [object!] event [event!] /local found][
+						either up? [
+							foreach face next gr/pane [ 
+								if within? event/face/offset + event/offset face/offset face/size [
+									found: yes 
+									break
+								]
+							]
+							if not found [
+								append gr/pane layout/only compose [
+									at (round/to event/offset + event/face/offset - (min-size / 2) grid) node
+								]
+							]
+						][
+							current: none boxing?: no
+						]
+					]
+					on-wheel: func [face [object!] event [event!]] [
+						face/offset/y: max lay/size/y - face/size/y min 0 10 * event/picked + face/offset/y
+					]
+				]
+				pane: layout/only compose [
+					at 0x0 edgs: panel beige (initial-size) []
+					all-over
+					with [menu: ["Node" _node "Text" _text]]
+					on-down [
 						boxing?: yes
 						append face/pane current: first layout/only compose/deep [
 							at (pos - 2) box 3x3 loose with [
@@ -323,49 +353,31 @@ context [
 						] 'done
 					]
 
-					on-over: func [face event][
+					on-over [
 						if all [event/down? not up? face = event/face] [
 							current/size: (current/draw/3: current/draw/10: event/offset - current/offset) + 10
 						]
 						pos: event/offset
 						if all [event/ctrl? event/mid-down? face = event/face] [ ; `mid-down?` doesn't work as `down?`
-							face/pane/1/draw/4: pos
+							edgs/pane/(length? edgs/pane)/draw/4: pos
 						]
 						'done
 					]
 
-					on-up: func [face event /local found][
-						either up? [
-							foreach-face/with face [found: yes break][
-								all [
-									face/extra/type = 'node
-									within? event/face/offset + event/offset face/offset face/size
-								]
-							]
-							if not found [
-								append face/pane layout/only compose [
-									at (round/to event/offset + event/face/offset - (min-size / 2) grid) node
-								]
-							]
-						][
-							current: none boxing?: no
-						]
-					]
-					
-					on-mid-up: func [face event /local new-node found][
+					on-mid-up [
 						if not mid-up? [
 							mid-up?: yes
-							append face/pane layout/only compose [
+							append gr/pane layout/only compose [
 								at (round/to event/offset - (min-size / 2) grid) node
 							]
 						]
 					]
 
-					on-menu: func [face event /local new][
+					on-menu [
 						switch/default event/picked [
 							_text [ask-name 'new if name [
 								test/text: name
-								append face/pane layout/only compose [
+								append gr/pane layout/only compose [
 									at (pos) text (size-text test) (name) loose 
 									on-drag [face/offset: round/to face/offset 5 'done]
 									on-down ['done]
@@ -377,12 +389,8 @@ context [
 								]
 							]]
 						][
-							new: last append face/pane layout/only compose [at (round/to pos grid) node]
+							append gr/pane layout/only compose [at (round/to pos grid) node]
 						]
-					]
-					
-					on-wheel: func [face event][
-						gr/offset/y: 10 * event/picked + gr/offset/y
 					]
 				]
 			]
@@ -401,7 +409,6 @@ context [
 						"Parse" 	parse
 						"VID" 		vid
 						"Draw" 		draw
-						;"Shape" 	shape
 						"Rich-text" rich-text
 						"Spec" 		spec
 					]
@@ -475,7 +482,7 @@ context [
 										]
 									]
 									event/ctrl? [
-										face/parent/pane/1/draw/5: event/offset + event/face/offset
+										edgs/pane/(length? edgs/pane)/draw/5: event/offset + event/face/offset
 									]
 								]
 							]
@@ -547,8 +554,10 @@ context [
 								expunge face
 							]
 							_detach [detach face]
-							_expand parse vid draw rich-text spec [;shape 
+							_expand parse vid draw rich-text spec [
+								time: now/time/precise
 								gr/visible?: no
+								system/view/auto-sync?: off
 								case [
 									1 < length? encoded: encode face [
 										nodes: tail face/parent/pane
@@ -591,18 +600,19 @@ context [
 										do face/data
 									]
 								]
+								show lay
+								system/view/auto-sync?: on
 								gr/visible?: yes
+								probe now/time/precise - time
 							]
 							_flatten [
-								face/text: copy get-plain face ;next head remove back tail mold encode face
+								face/text: copy get-plain face
 								remove-in-faces face
-								prepare face
 								face/data: load/all face/text
+								prepare face
 							]
 							_shorten [
-								face/text: append copy/part face/text 30 "..."
-								prepare face
-								adjust-edges face
+								shorten-text face 30
 								change/part find face/menu "Shorten" ["Full" _full] 2
 							]
 							_full [
@@ -888,7 +898,7 @@ context [
 					][
 						connect/dialect node next nodes dsl
 					]
-					find styles: union sys-styles usr-styles nod [ ;keys-of system/view/vid/styles nod [
+					find styles: union sys-styles usr-styles nod [ 
 						nodes: next nodes
 						while [not any [
 							tail? nodes
@@ -1042,16 +1052,16 @@ context [
 			]
 		]
 		
-		add-edge: function [node root nodes /with label][
+		add-edge: function [node [object!] root [object!] /with label [string!]][
 			label: any [label copy ""]
 			edge: first layout/only compose/deep bind connector context [
 				face: node labl: label
-			]
+			] 
 			append node/extra/out_ edge
 			edge/draw/5: root/size / 2 + root/offset
 			edge/extra/to: root 
 			append root/extra/in_ edge 
-			insert head nodes edge
+			append edgs/pane edge
 		]
 		
 		make-ops: function [val1 op nodes /with root][
@@ -1065,10 +1075,10 @@ context [
 			][val1/extra/in_/:len/extra/from][val1]
 			max-y: round/to val1_/offset/y + val1_/size/y + dy grid
 			val2/offset/y: max-y
-			add-edge/with val1 op nodes "value1"
-			add-edge/with val2 op nodes "value2"
+			add-edge/with val1 op "value1"
+			add-edge/with val2 op "value2"
 			lower op 
-			rest: skip nodes 2
+			rest: nodes 
 			case [
 				all [3 <= length? rest is-op? rest/2][
 					set [op rest] make-ops/with op rest/2 skip rest 2 root
@@ -1101,7 +1111,7 @@ context [
 				node/offset/y: max-y
 			]
 						
-			add-edge/with node root nodes: next nodes label
+			add-edge/with node root label
 
 			if is-op? node [
 				lower root
@@ -1115,7 +1125,6 @@ context [
 					parse [expand/parse node nodes dsl]
 					vid [expand/vid node nodes dsl]
 					draw [expand/draw node nodes dsl]
-					;shape [expand/shape node nodes dsl]
 					rich-text [expand/rt node nodes dsl]
 					spec [expand/spec node nodes dsl]
 				]
@@ -1162,7 +1171,8 @@ context [
 			nods
 		]
 		
-		set 'ast func [code [block! file! any-function! object! map!] /no-color /local i][
+		set 'ast func [code [block! file! any-function! object! map!] /no-color /local i time][
+			time: now/time/precise
 			bw: no-color
 			clear head nodes
 			clear usr-styles
@@ -1192,15 +1202,17 @@ context [
 				]
 			]
 
-			lay: layout/flags append/only copy [
+			lay: layout/flags/tight copy [
 				on-resizing [
-					gr/size: max gr/size face/size - 20
+					gr/size: edgs/size: max gr/size face/size - 20
 					resize-edges
 				] 
 				gr: graph initial-size
-			] nodes 'resize
-
-			nodes: gr/pane 
+			] 'resize
+			
+			append gr/pane layout/only nodes
+			
+			nodes: next gr/pane 
 			
 			if not empty? nodes [
 				until [
@@ -1225,7 +1237,11 @@ context [
 				adjust-panel-height
 			]
 
-			view lay
+			view/no-wait lay
+
+			probe now/time/precise - time
+			
+			do-events
 		]
 	]
 ]
