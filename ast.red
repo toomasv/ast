@@ -788,7 +788,14 @@ graph-ctx: context [
 			hline 'hline vline 'vline 
 		]
 		
-		colors: extract load help-string tuple! 2
+		;colors: extract load help-string tuple! 2
+ 		colors: [
+			red white transparent gray aqua beige black blue brick brown coal 
+			coffee crimson cyan forest gold green ivory khaki leaf linen magenta maroon 
+			mint navy oldrab olive orange papaya pewter pink purple reblue rebolor sienna 
+			silver sky snow tanned teal violet water wheat yello yellow glass
+		]
+
 		
 		inc-max-y: does [
 			max-y: max-y + min-size/y + dy
