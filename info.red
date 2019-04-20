@@ -1,26 +1,47 @@
 Red []
-;info-ctx: context [
-	get-function: function [path][
-		if path? path [
-			path: copy path 
-			while [
-				not any [
-					tail? path 
-					any-function? attempt [get/any either 1 = length? path [path/1][path]]
-				]
-			][
-				clear back tail path
-			] 
-			return either empty? path [none][path]
-		] none
-	]
-	info: func ['fn	/local intr ars refs locs ret arg ref typ irefs rargs rf fnc][
+;context [
+	;get-function: func [path [path!]][
+	;	if path? path [
+	;		path: copy path 
+	;		while [
+	;			not any [
+	;				tail? path 
+	;				any-function? attempt/safer [either 1 = length? path [get/any path/1][get/any path]]
+	;			]
+	;		][
+	;			clear back tail path
+	;		] 
+	;		return either empty? path [none][path]
+	;	] 
+	;	none
+	;]
+	set 'info func ['fn	/local intr ars refs locs ret arg ref typ irefs rargs rf fnc][
 		intr: copy "" ars: make map! copy [] refs: make map! copy [] locs: copy [] ret: copy [] irefs: copy [] typ: ref-arg: ref-arg-type: none
-		;if path? fn [irefs: copy next to-block fn fn: first fn]
-		if path? fn [either fnc: get-function fn [irefs: copy skip fn: to-block fn length? fnc if 1 = length? fnc [fn: fn/1]][return none]]
-		if lit-word? fn [fn: to-word fn]
+		case [
+			path? fn [
+				fn: copy fn 
+				while [
+					not any [
+						tail? fn 
+						any-function? attempt/safer [
+							either 1 = length? fn [get/any fn/1][get/any fn]
+						]
+					]
+				][
+					clear back tail fn
+				] 
+				either empty? fn [fnc: none][fnc: fn]
+				either fnc [
+					irefs: copy skip fn: to-block fn length? fnc 
+					if 1 = length? fnc [fn: fn/1]
+				][
+					return none
+				]
+			]
+			lit-word? fn [fn: to-word fn]
+		]
 		unless all [value? fn any [word? fn path? fn] any-function? get fn] [
-			return none;cause-error 'user 'message ["Only function types accepted for `info`!"]
+			return none
 		]
 		out: make map! copy []
 		specs: spec-of get fn 
